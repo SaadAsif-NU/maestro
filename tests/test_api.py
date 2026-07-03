@@ -39,6 +39,30 @@ def test_missing_run_is_404():
     assert client.get("/api/runs/does-not-exist").status_code == 404
 
 
+def test_list_runs():
+    client.post("/api/runs", json={"goal": "list-me-A"})
+    client.post("/api/runs", json={"goal": "list-me-B"})
+    runs = client.get("/api/runs").json()["runs"]
+    assert len(runs) >= 2
+    assert {"run_id", "goal", "status"} <= set(runs[0])
+
+
+def test_cancel_missing_run_is_404():
+    assert client.post("/api/runs/nope/cancel").status_code == 404
+
+
+def test_cancel_returns_ok():
+    run_id = client.post("/api/runs", json={"goal": "cancel-me"}).json()["run_id"]
+    resp = client.post(f"/api/runs/{run_id}/cancel")
+    assert resp.status_code == 200
+    assert resp.json()["status"] in {"cancelled", "not_running"}
+
+
+def test_team_size_is_configurable():
+    run_id = client.post("/api/runs", json={"goal": "big team", "researchers": 4}).json()["run_id"]
+    assert run_id.startswith("run_")
+
+
 def test_invalid_goal_is_422():
     assert client.post("/api/runs", json={"goal": ""}).status_code == 422
 

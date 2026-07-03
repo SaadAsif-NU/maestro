@@ -45,6 +45,19 @@ async def start_run(body: RunRequest) -> dict[str, str]:
     return {"run_id": handle.run_id, "brain": build_brain().name}
 
 
+@app.get("/api/runs")
+async def list_runs() -> dict[str, list[dict[str, str]]]:
+    return {"runs": engine.list_runs()}
+
+
+@app.post("/api/runs/{run_id}/cancel")
+async def cancel_run(run_id: str) -> JSONResponse:
+    if engine.get(run_id) is None:
+        return JSONResponse(status_code=404, content={"error": "run not found"})
+    cancelled = engine.cancel(run_id)
+    return JSONResponse({"status": "cancelled" if cancelled else "not_running"})
+
+
 @app.get("/api/runs/{run_id}")
 async def get_run(run_id: str) -> JSONResponse:
     handle = engine.get(run_id)

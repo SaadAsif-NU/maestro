@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 
 from .brains import build_brain
 from .brains.base import Brain
-from .events import ERROR, Event, EventBus
+from .events import ERROR, RUN_CANCELLED, Event, EventBus
 from .orchestrator import Orchestrator
 from .tools import default_toolbox
 from .tools.base import Tool
@@ -66,6 +66,27 @@ class Engine:
 
     def get(self, run_id: str) -> RunHandle | None:
         return self._runs.get(run_id)
+
+    def list_runs(self) -> list[dict[str, str]]:
+        """Newest-first list of runs in this session, for the history panel."""
+        return [
+            {"run_id": h.run_id, "goal": h.goal, "status": h.status.value}
+            for h in reversed(list(self._runs.values()))
+        ]
+
+    def cancel(self, run_id: str) -> bool:
+        """Stop a running run. Returns ``True`` if it was cancellable."""
+        handle = self._runs.get(run_id)
+        if handle is None or handle.status is not RunStatus.RUNNING:
+            return False
+        handle.status = RunStatus.CANCELLED
+        if not handle.bus.closed:
+            handle.bus.emit(RUN_CANCELLED, message="cancelled by user")
+        if handle.task is not None and not handle.task.done():
+            handle.task.cancel()
+        if not handle.bus.closed:
+            handle.bus.close()
+        return True
 
     async def subscribe(self, run_id: str) -> AsyncIterator[Event]:
         handle = self._runs[run_id]

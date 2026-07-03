@@ -32,6 +32,7 @@ EDGE = "edge"
 AGENT_COMPLETED = "agent_completed"
 METRICS = "metrics"
 RUN_COMPLETED = "run_completed"
+RUN_CANCELLED = "run_cancelled"
 ERROR = "error"
 
 
