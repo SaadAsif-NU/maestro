@@ -4,7 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Maestro · Multi-Agent Studio</title>
-    <link rel="preconnect" href="/static/styles.css" />
     <link rel="stylesheet" href="/static/styles.css" />
     <link
       rel="icon"
@@ -33,21 +32,34 @@
           autocomplete="off"
           placeholder="Give the team a goal, e.g. Design a go-to-market strategy for a B2B SaaS analytics product"
         />
+        <div class="team">
+          <span class="team-label">Researchers</span>
+          <div id="team-size" class="segmented" role="group" aria-label="Number of researchers">
+            <button data-n="1">1</button>
+            <button data-n="2" class="active">2</button>
+            <button data-n="3">3</button>
+            <button data-n="4">4</button>
+          </div>
+        </div>
         <button id="run-btn" class="run-btn">Run ▸</button>
+        <button id="stop-btn" class="stop-btn hidden">Stop ■</button>
       </section>
       <div id="examples" class="examples"></div>
+      <div id="history" class="history hidden"></div>
 
       <main class="stage">
         <section class="graph-panel panel">
           <div class="panel-head">
             <h2>Agent graph</h2>
-            <span class="panel-hint">live orchestration</span>
+            <span class="panel-hint" id="graph-hint">live orchestration</span>
           </div>
           <div id="graph-wrap" class="graph-wrap">
             <svg id="graph" xmlns="http://www.w3.org/2000/svg"></svg>
             <div id="nodes" class="nodes"></div>
             <div id="graph-empty" class="graph-empty">
-              Enter a goal and press Run to assemble the team.
+              <div class="empty-glyph">◆</div>
+              <div>Enter a goal and press Run to assemble the team.</div>
+              <div class="empty-sub">Tip: click any agent while it works to inspect its full reasoning.</div>
             </div>
           </div>
         </section>
@@ -55,7 +67,7 @@
         <aside class="side">
           <div class="metrics">
             <div class="metric"><span class="metric-val" id="m-agents">0</span><span class="metric-lbl">agents</span></div>
-            <div class="metric"><span class="metric-val" id="m-tokens">0</span><span class="metric-lbl">tokens</span></div>
+            <div class="metric"><span class="metric-val" id="m-tokens">0</span><span class="metric-lbl" id="m-rate">tokens</span></div>
             <div class="metric"><span class="metric-val" id="m-tools">0</span><span class="metric-lbl">tool calls</span></div>
             <div class="metric"><span class="metric-val" id="m-time">0.0s</span><span class="metric-lbl">elapsed</span></div>
           </div>
@@ -70,11 +82,31 @@
       <section id="deliverable-panel" class="panel deliverable hidden">
         <div class="panel-head">
           <h2>Deliverable</h2>
-          <span id="deliverable-meta" class="panel-hint"></span>
+          <div class="deliverable-actions">
+            <span id="deliverable-meta" class="panel-hint"></span>
+            <button id="copy-btn" class="mini-btn">Copy</button>
+            <button id="download-btn" class="mini-btn">Download .md</button>
+          </div>
         </div>
         <div id="deliverable" class="deliverable-body"></div>
       </section>
     </div>
+
+    <!-- Agent inspector drawer -->
+    <div id="drawer-scrim" class="drawer-scrim"></div>
+    <aside id="drawer" class="drawer" aria-live="polite">
+      <div class="drawer-head">
+        <div>
+          <div id="drawer-role" class="node-role"></div>
+          <h3 id="drawer-title">Agent</h3>
+        </div>
+        <button id="drawer-close" class="mini-btn">Close ✕</button>
+      </div>
+      <div class="drawer-stats" id="drawer-stats"></div>
+      <div id="drawer-tools" class="drawer-tools"></div>
+      <div class="drawer-label">Full reasoning</div>
+      <pre id="drawer-body" class="drawer-body"></pre>
+    </aside>
 
     <script src="/static/app.js"></script>
   </body>

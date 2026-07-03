@@ -18,15 +18,20 @@ const EXAMPLES = [
 const $ = (id) => document.getElementById(id);
 
 const state = {
-  nodes: new Map(), // id -> {el, role, status, tokens, thought, cx, cy, thoughtEl, tokEl, toolEl, feedEl}
+  nodes: new Map(),
   researchers: [],
-  edges: [], // {source, target, pathEl}
+  edges: [],
   ws: null,
   running: false,
+  isLive: false,
+  runId: null,
+  teamSize: 2,
   startTime: 0,
   timer: null,
   tokens: 0,
   tools: 0,
+  deliverableMd: "",
+  history: [],
 };
 
 // ---------- setup ----------
@@ -42,10 +47,30 @@ function init() {
     };
     ex.appendChild(chip);
   });
+
   $("run-btn").onclick = startRun;
+  $("stop-btn").onclick = stopRun;
   $("goal").addEventListener("keydown", (e) => {
     if (e.key === "Enter") startRun();
   });
+
+  $("team-size").querySelectorAll("button").forEach((b) => {
+    b.onclick = () => {
+      state.teamSize = Number(b.dataset.n);
+      $("team-size")
+        .querySelectorAll("button")
+        .forEach((x) => x.classList.toggle("active", x === b));
+    };
+  });
+
+  $("copy-btn").onclick = copyDeliverable;
+  $("download-btn").onclick = downloadDeliverable;
+  $("drawer-close").onclick = closeDrawer;
+  $("drawer-scrim").onclick = closeDrawer;
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeDrawer();
+  });
+
   fetch("/health")
     .then((r) => r.json())
     .then((d) => ($("brain-badge").textContent = `brain: ${d.brain}`))
@@ -54,6 +79,7 @@ function init() {
     layout();
     redrawEdges();
   });
+  $("goal").focus();
 }
 
 function setStatus(kind, label) {
@@ -72,25 +98,41 @@ async function startRun() {
   }
   resetUI();
   state.running = true;
+  state.isLive = true;
   $("run-btn").disabled = true;
+  $("stop-btn").classList.remove("hidden");
   setStatus("running", "orchestrating");
   startTimer();
 
-  let runId;
+  let data;
   try {
     const resp = await fetch("/api/runs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ goal, researchers: 2 }),
+      body: JSON.stringify({ goal, researchers: state.teamSize }),
     });
-    const data = await resp.json();
-    runId = data.run_id;
-    $("brain-badge").textContent = `brain: ${data.brain}`;
+    data = await resp.json();
   } catch (err) {
     setStatus("error", "failed to start");
     finishRun();
     return;
   }
+  state.runId = data.run_id;
+  $("brain-badge").textContent = `brain: ${data.brain}`;
+  addHistory(data.run_id, goal, "running");
+  openSocket(data.run_id);
+}
+
+function loadRun(runId, goal) {
+  if (state.running) return;
+  resetUI();
+  state.running = true;
+  state.isLive = false;
+  state.runId = runId;
+  $("run-btn").disabled = true;
+  $("graph-hint").textContent = "replaying";
+  setStatus("running", "replaying");
+  startTimer();
   openSocket(runId);
 }
 
@@ -103,9 +145,23 @@ function openSocket(runId) {
   ws.onerror = () => setStatus("error", "connection error");
 }
 
+async function stopRun() {
+  if (!state.runId || !state.isLive) return;
+  $("stop-btn").disabled = true;
+  try {
+    await fetch(`/api/runs/${state.runId}/cancel`, { method: "POST" });
+  } catch (err) {
+    /* the socket close will settle the UI */
+  }
+}
+
 function finishRun() {
   state.running = false;
+  state.isLive = false;
   $("run-btn").disabled = false;
+  $("stop-btn").classList.add("hidden");
+  $("stop-btn").disabled = false;
+  $("graph-hint").textContent = "live orchestration";
   stopTimer();
 }
 
@@ -116,6 +172,7 @@ function resetUI() {
   $("graph-empty").style.display = "none";
   $("deliverable-panel").classList.add("hidden");
   $("deliverable").innerHTML = "";
+  closeDrawer();
   state.nodes.clear();
   state.researchers = [];
   state.edges = [];
@@ -125,6 +182,7 @@ function resetUI() {
   $("m-tokens").textContent = "0";
   $("m-tools").textContent = "0";
   $("m-time").textContent = "0.0s";
+  $("m-rate").textContent = "tokens";
 }
 
 // ---------- timers / metrics ----------
@@ -133,11 +191,42 @@ function startTimer() {
   state.timer = setInterval(() => {
     const s = (performance.now() - state.startTime) / 1000;
     $("m-time").textContent = `${s.toFixed(1)}s`;
+    if (s > 0.2) $("m-rate").textContent = `${Math.round(state.tokens / s)} tok/s`;
   }, 100);
 }
 function stopTimer() {
   if (state.timer) clearInterval(state.timer);
   state.timer = null;
+}
+
+// ---------- history ----------
+function addHistory(runId, goal, status) {
+  state.history.unshift({ runId, goal, status });
+  renderHistory();
+}
+function updateHistory(runId, status) {
+  const item = state.history.find((h) => h.runId === runId);
+  if (item) item.status = status;
+  renderHistory();
+}
+function renderHistory() {
+  const wrap = $("history");
+  wrap.innerHTML = "";
+  if (state.history.length === 0) {
+    wrap.classList.add("hidden");
+    return;
+  }
+  wrap.classList.remove("hidden");
+  state.history.slice(0, 6).forEach((h) => {
+    const pill = document.createElement("div");
+    pill.className = "run-pill";
+    pill.title = `Replay: ${h.goal}`;
+    pill.innerHTML = `<span class="rdot ${h.status}"></span><span class="goal">${escapeHtml(
+      h.goal
+    )}</span>`;
+    pill.onclick = () => loadRun(h.runId, h.goal);
+    wrap.appendChild(pill);
+  });
 }
 
 // ---------- event handling ----------
@@ -150,16 +239,16 @@ function handleEvent(evt) {
       addEdge(evt.data.source, evt.data.target);
       break;
     case "agent_status":
-      onStatus(evt.agent_id, evt.role, evt.data.status);
+      onStatus(evt.agent_id, evt.data.status);
       break;
     case "token":
       onToken(evt.agent_id, evt.role, evt.data.text);
       break;
     case "tool_call":
-      onToolCall(evt.agent_id, evt.role, evt.data.tool, evt.data.argument);
+      onToolCall(evt.agent_id, evt.data.tool, evt.data.argument);
       break;
     case "tool_result":
-      onToolResult(evt.role, evt.data.tool, evt.data.result);
+      onToolResult(evt.agent_id, evt.role, evt.data.tool, evt.data.result);
       break;
     case "agent_completed":
       onCompleted(evt.agent_id);
@@ -167,9 +256,15 @@ function handleEvent(evt) {
     case "run_completed":
       onRunCompleted(evt.data);
       break;
+    case "run_cancelled":
+      setStatus("error", "cancelled");
+      if (state.runId) updateHistory(state.runId, "cancelled");
+      feed("system", "system", "run cancelled");
+      break;
     case "error":
       setStatus("error", "error");
-      feed("error", "system", evt.data.message || "run failed");
+      if (state.runId) updateHistory(state.runId, "failed");
+      feed("system", "system", evt.data.message || "run failed");
       break;
   }
 }
@@ -192,18 +287,22 @@ function addNode(id, role, title) {
       <span class="node-tokens">0 tok</span>
       <span class="node-tool"></span>
     </div>`;
+  el.onclick = () => openDrawer(id);
   $("nodes").appendChild(el);
-  const node = {
+  state.nodes.set(id, {
     el,
     role,
+    title: title || role,
     tokens: 0,
     thought: "",
+    full: "",
+    toolCalls: [],
     thoughtEl: el.querySelector(".node-thought"),
     tokEl: el.querySelector(".node-tokens"),
     toolEl: el.querySelector(".node-tool"),
     feedEl: null,
-  };
-  state.nodes.set(id, node);
+    pulsedIn: false,
+  });
   if (role === "researcher") state.researchers.push(id);
   $("m-agents").textContent = String(state.nodes.size);
   layout();
@@ -214,9 +313,7 @@ function layout() {
   const wrap = $("graph-wrap");
   const W = wrap.clientWidth;
   const H = wrap.clientHeight;
-  const svg = $("graph");
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-
+  $("graph").setAttribute("viewBox", `0 0 ${W} ${H}`);
   const place = (id, x, y) => {
     const n = state.nodes.get(id);
     if (!n) return;
@@ -225,7 +322,6 @@ function layout() {
     n.el.style.left = `${x}px`;
     n.el.style.top = `${y}px`;
   };
-
   place("orchestrator", W / 2, H * 0.09);
   const rs = state.researchers;
   rs.forEach((id, i) => {
@@ -244,22 +340,17 @@ function addEdge(source, target) {
   state.edges.push({ source, target, pathEl: path });
   redrawEdges();
 }
-
 function edgePath(a, b) {
   const dy = (b.cy - a.cy) * 0.5;
   return `M ${a.cx} ${a.cy} C ${a.cx} ${a.cy + dy}, ${b.cx} ${b.cy - dy}, ${b.cx} ${b.cy}`;
 }
-
 function redrawEdges() {
   for (const edge of state.edges) {
     const a = state.nodes.get(edge.source);
     const b = state.nodes.get(edge.target);
-    if (a && b && a.cx != null && b.cx != null) {
-      edge.pathEl.setAttribute("d", edgePath(a, b));
-    }
+    if (a && b && a.cx != null && b.cx != null) edge.pathEl.setAttribute("d", edgePath(a, b));
   }
 }
-
 function pulseInto(targetId) {
   for (const edge of state.edges) {
     if (edge.target !== targetId) continue;
@@ -284,16 +375,16 @@ function pulseInto(targetId) {
 }
 
 // ---------- node updates ----------
-function onStatus(id, role, status) {
+function onStatus(id, status) {
   const n = state.nodes.get(id);
   if (!n) return;
   n.el.classList.remove("thinking", "using_tool", "done");
   if (status === "thinking") {
     n.el.classList.add("thinking");
-    n.feedEl = null; // next tokens start a fresh transcript line
+    n.feedEl = null;
     if (!n.pulsedIn) {
       n.pulsedIn = true;
-      pulseInto(id); // animate the handoff edge as work reaches this agent
+      pulseInto(id);
     }
   } else if (status === "using_tool") {
     n.el.classList.add("using_tool");
@@ -306,22 +397,25 @@ function onToken(id, role, text) {
   const n = state.nodes.get(id);
   if (!n) return;
   n.tokens += 1;
+  n.full += text;
   n.thought = (n.thought + text).slice(-160);
   n.thoughtEl.textContent = n.thought;
   n.tokEl.textContent = `${n.tokens} tok`;
   state.tokens += 1;
   $("m-tokens").textContent = String(state.tokens);
-  // stream into the live feed, one growing line per thinking burst
   if (!n.feedEl) n.feedEl = feed(role, role, "");
   n.feedEl.textContent += text;
   autoscrollFeed();
+  refreshDrawer(id);
 }
 
-function onToolCall(id, role, tool, argument) {
+function onToolCall(id, tool, argument) {
   const n = state.nodes.get(id);
   if (n) {
     n.toolEl.textContent = tool;
     n.toolEl.classList.add("show");
+    n.toolCalls.push({ tool, argument, result: "" });
+    refreshDrawer(id);
   }
   state.tools += 1;
   $("m-tools").textContent = String(state.tools);
@@ -334,7 +428,12 @@ function onToolCall(id, role, tool, argument) {
   autoscrollFeed();
 }
 
-function onToolResult(role, tool, result) {
+function onToolResult(id, role, tool, result) {
+  const n = state.nodes.get(id);
+  if (n && n.toolCalls.length) {
+    n.toolCalls[n.toolCalls.length - 1].result = result;
+    refreshDrawer(id);
+  }
   const excerpt = result.length > 130 ? result.slice(0, 130) + "..." : result;
   const item = feed(role, "result", excerpt);
   item.parentElement.classList.add("feed-tool");
@@ -347,8 +446,15 @@ function onCompleted(id) {
 
 function onRunCompleted(data) {
   setStatus("done", "delivered");
+  stopTimer();
   $("m-tokens").textContent = String(data.total_tokens ?? state.tokens);
   $("m-tools").textContent = String(data.total_tool_calls ?? state.tools);
+  const secs = (data.elapsed_ms ?? 0) / 1000;
+  if (secs > 0) {
+    $("m-time").textContent = `${secs.toFixed(1)}s`;
+    $("m-rate").textContent = `${Math.round((data.total_tokens ?? state.tokens) / secs)} tok/s`;
+  }
+  if (state.runId) updateHistory(state.runId, "completed");
   renderDeliverable(data.deliverable || "", data);
 }
 
@@ -356,10 +462,9 @@ function onRunCompleted(data) {
 function feed(role, tag, text) {
   const item = document.createElement("div");
   item.className = "feed-item";
-  const color = ROLE_COLORS[role] || "var(--muted)";
   const tagEl = document.createElement("span");
   tagEl.className = "feed-tag";
-  tagEl.style.color = color;
+  tagEl.style.color = ROLE_COLORS[role] || "var(--muted)";
   tagEl.textContent = tag;
   const textEl = document.createElement("span");
   textEl.className = "feed-text";
@@ -375,18 +480,75 @@ function autoscrollFeed() {
   f.scrollTop = f.scrollHeight;
 }
 
+// ---------- agent drawer ----------
+function openDrawer(id) {
+  state.drawerId = id;
+  refreshDrawer(id, true);
+  $("drawer").classList.add("open");
+  $("drawer-scrim").classList.add("open");
+}
+function closeDrawer() {
+  state.drawerId = null;
+  $("drawer").classList.remove("open");
+  $("drawer-scrim").classList.remove("open");
+}
+function refreshDrawer(id, force) {
+  if (state.drawerId !== id && !force) return;
+  if (state.drawerId !== id) return;
+  const n = state.nodes.get(id);
+  if (!n) return;
+  $("drawer-role").textContent = n.role;
+  $("drawer-role").style.color = ROLE_COLORS[n.role] || "var(--accent)";
+  $("drawer-title").textContent = n.title;
+  $("drawer-stats").innerHTML =
+    `<div class="drawer-stat"><b>${n.tokens}</b>tokens</div>` +
+    `<div class="drawer-stat"><b>${n.toolCalls.length}</b>tool calls</div>`;
+  $("drawer-tools").innerHTML = n.toolCalls
+    .map(
+      (t) =>
+        `<div class="drawer-tool">${escapeHtml(t.tool)}(${escapeHtml(t.argument)})<br>&rarr; ${escapeHtml(
+          t.result || "..."
+        )}</div>`
+    )
+    .join("");
+  $("drawer-body").textContent = n.full || "(no output yet)";
+}
+
 // ---------- deliverable ----------
 function renderDeliverable(md, data) {
+  state.deliverableMd = md;
   $("deliverable").innerHTML = renderMarkdown(md);
-  const meta = `${data.agents ?? state.nodes.size} agents · ${
+  $("deliverable-meta").textContent = `${data.agents ?? state.nodes.size} agents · ${
     data.total_tokens ?? state.tokens
   } tokens · ${data.total_tool_calls ?? state.tools} tool calls · ${(
     (data.elapsed_ms ?? 0) / 1000
   ).toFixed(1)}s`;
-  $("deliverable-meta").textContent = meta;
   const panel = $("deliverable-panel");
   panel.classList.remove("hidden");
+  panel.classList.remove("arrived");
+  void panel.offsetWidth; // restart the arrival animation
+  panel.classList.add("arrived");
   panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function copyDeliverable() {
+  if (!state.deliverableMd) return;
+  navigator.clipboard.writeText(state.deliverableMd).then(() => flash($("copy-btn"), "Copied"));
+}
+function downloadDeliverable() {
+  if (!state.deliverableMd) return;
+  const blob = new Blob([state.deliverableMd], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "maestro-deliverable.md";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function flash(btn, text) {
+  const original = btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => (btn.textContent = original), 1400);
 }
 
 function renderMarkdown(md) {
