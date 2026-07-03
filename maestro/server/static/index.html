@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Maestro · Multi-Agent Studio</title>
+    <link rel="preconnect" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8E%9B%EF%B8%8F%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">◆</span>
+          <span class="brand-name">Maestro</span>
+          <span class="brand-sub">multi-agent orchestration studio</span>
+        </div>
+        <div class="topbar-right">
+          <span id="brain-badge" class="badge">brain: ...</span>
+          <span id="status-pill" class="pill pill-idle">idle</span>
+        </div>
+      </header>
+
+      <section class="command">
+        <input
+          id="goal"
+          class="goal-input"
+          type="text"
+          autocomplete="off"
+          placeholder="Give the team a goal, e.g. Design a go-to-market strategy for a B2B SaaS analytics product"
+        />
+        <button id="run-btn" class="run-btn">Run ▸</button>
+      </section>
+      <div id="examples" class="examples"></div>
+
+      <main class="stage">
+        <section class="graph-panel panel">
+          <div class="panel-head">
+            <h2>Agent graph</h2>
+            <span class="panel-hint">live orchestration</span>
+          </div>
+          <div id="graph-wrap" class="graph-wrap">
+            <svg id="graph" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div id="nodes" class="nodes"></div>
+            <div id="graph-empty" class="graph-empty">
+              Enter a goal and press Run to assemble the team.
+            </div>
+          </div>
+        </section>
+
+        <aside class="side">
+          <div class="metrics">
+            <div class="metric"><span class="metric-val" id="m-agents">0</span><span class="metric-lbl">agents</span></div>
+            <div class="metric"><span class="metric-val" id="m-tokens">0</span><span class="metric-lbl">tokens</span></div>
+            <div class="metric"><span class="metric-val" id="m-tools">0</span><span class="metric-lbl">tool calls</span></div>
+            <div class="metric"><span class="metric-val" id="m-time">0.0s</span><span class="metric-lbl">elapsed</span></div>
+          </div>
+
+          <div class="panel feed-panel">
+            <div class="panel-head"><h2>Live activity</h2></div>
+            <div id="feed" class="feed"></div>
+          </div>
+        </aside>
+      </main>
+
+      <section id="deliverable-panel" class="panel deliverable hidden">
+        <div class="panel-head">
+          <h2>Deliverable</h2>
+          <span id="deliverable-meta" class="panel-hint"></span>
+        </div>
+        <div id="deliverable" class="deliverable-body"></div>
+      </section>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
