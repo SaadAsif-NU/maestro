@@ -3,8 +3,12 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 
+import pytest
+
+from maestro.brains import SimulatedBrain
 from maestro.brains.base import Brain
-from maestro.engine import Engine
+from maestro.config import Settings
+from maestro.engine import Engine, EngineBusyError
 from maestro.types import RunStatus
 
 
@@ -59,3 +63,32 @@ async def test_cancel_running_run():
 
 async def test_cancel_unknown_run(fast_engine):
     assert fast_engine.cancel("nope") is False
+
+
+async def test_run_store_is_bounded(monkeypatch):
+    monkeypatch.setenv("MAESTRO_MAX_RUNS", "3")
+    engine = Engine(brain_factory=lambda: SimulatedBrain(delay=0.0), settings=Settings.from_env())
+    for i in range(6):
+        await engine.run_to_completion(f"design plan number {i}")
+    assert len(engine.list_runs()) <= 3
+
+
+async def test_run_times_out(monkeypatch):
+    monkeypatch.setenv("MAESTRO_RUN_TIMEOUT", "0.05")
+    engine = Engine(brain_factory=lambda: _SlowBrain(), settings=Settings.from_env())
+    handle = engine.start_run("design a detailed plan")
+    assert handle.task is not None
+    await handle.task
+    assert handle.status is RunStatus.FAILED
+    assert any(
+        e.type == "error" and "timed out" in e.data.get("message", "") for e in handle.bus.log
+    )
+
+
+async def test_rejects_when_too_many_active(monkeypatch):
+    monkeypatch.setenv("MAESTRO_MAX_CONCURRENT_RUNS", "1")
+    engine = Engine(brain_factory=lambda: _SlowBrain(), settings=Settings.from_env())
+    first = engine.start_run("design a detailed plan")  # stays running on the slow brain
+    with pytest.raises(EngineBusyError):
+        engine.start_run("design another detailed plan")
+    engine.cancel(first.run_id)

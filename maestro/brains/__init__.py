@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from ..config import Settings
 from .base import Brain
 from .simulated import SimulatedBrain
 
@@ -50,10 +51,6 @@ def _gemini_key() -> str | None:
     return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 
 
-def _max_concurrency() -> int:
-    return int(os.environ.get("MAESTRO_MAX_CONCURRENCY", "3"))
-
-
 def provider_status() -> dict[str, bool]:
     """Which providers have an API key configured (offline is always available)."""
     return {
@@ -71,7 +68,7 @@ def provider_models(provider: str) -> list[str]:
 
 def default_selection() -> tuple[str, str]:
     """The provider/model a keyless run would auto-pick (respects MAESTRO_MODEL)."""
-    override = os.environ.get("MAESTRO_MODEL")
+    override = Settings.from_env().model_override
     if _gemini_key():
         return ("gemini", override or _DEFAULT_GEMINI)
     if os.environ.get("OPENAI_API_KEY"):
@@ -79,8 +76,8 @@ def default_selection() -> tuple[str, str]:
     return ("simulated", "simulated")
 
 
-def _simulated() -> Brain:
-    return SimulatedBrain(delay=float(os.environ.get("MAESTRO_SIM_DELAY", "0.02")))
+def _simulated(settings: Settings) -> Brain:
+    return SimulatedBrain(delay=settings.sim_delay)
 
 
 def build_brain(provider: str | None = None, model: str | None = None) -> Brain:
@@ -89,6 +86,7 @@ def build_brain(provider: str | None = None, model: str | None = None) -> Brain:
     Falls back to the offline brain if a real provider is requested without a key,
     so a run never crashes.
     """
+    settings = Settings.from_env()
     if provider is None:
         provider, model = default_selection()
 
@@ -101,7 +99,7 @@ def build_brain(provider: str | None = None, model: str | None = None) -> Brain:
             model=chosen,
             base_url=os.environ.get("GEMINI_BASE_URL", _GEMINI_OPENAI_BASE),
             name=chosen,
-            max_concurrency=_max_concurrency(),
+            max_concurrency=settings.max_concurrency,
         )
     if provider == "openai" and os.environ.get("OPENAI_API_KEY"):
         from .openai import OpenAIBrain
@@ -111,9 +109,9 @@ def build_brain(provider: str | None = None, model: str | None = None) -> Brain:
             model=chosen,
             base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
             name=chosen,
-            max_concurrency=_max_concurrency(),
+            max_concurrency=settings.max_concurrency,
         )
-    return _simulated()
+    return _simulated(settings)
 
 
 def __getattr__(name: str) -> object:

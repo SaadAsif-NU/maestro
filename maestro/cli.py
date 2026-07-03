@@ -11,9 +11,12 @@ from . import __version__
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
+    from .config import Settings
     from .env import load_env
+    from .observability import configure_logging
 
     load_env()  # load a .env file if present
+    configure_logging(Settings.from_env().log_level)
 
     parser = argparse.ArgumentParser(prog="maestro", description="Maestro multi-agent studio")
     parser.add_argument("--version", action="version", version=f"maestro {__version__}")
