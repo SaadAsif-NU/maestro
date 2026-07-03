@@ -24,7 +24,12 @@ from fastapi.staticfiles import StaticFiles
 from .. import __version__
 from ..brains import build_brain
 from ..engine import Engine
+from ..env import load_env
 from ..types import RunRequest
+
+# Pick up keys/config from a .env file if present, so users need not export
+# environment variables in the shell.
+load_env()
 
 _STATIC = Path(__file__).parent / "static"
 

@@ -11,6 +11,10 @@ from . import __version__
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
+    from .env import load_env
+
+    load_env()  # load a .env file if present
+
     parser = argparse.ArgumentParser(prog="maestro", description="Maestro multi-agent studio")
     parser.add_argument("--version", action="version", version=f"maestro {__version__}")
     sub = parser.add_subparsers(dest="command")
