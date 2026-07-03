@@ -1,0 +1,16 @@
+services:
+  maestro:
+    build: .
+    image: maestro:latest
+    ports:
+      - "8000:8000"
+    environment:
+      MAESTRO_LOG_LEVEL: INFO
+      # Drop in a real key to run live models instead of the offline simulation:
+      # OPENAI_API_KEY: ${OPENAI_API_KEY}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
