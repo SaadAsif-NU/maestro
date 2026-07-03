@@ -21,14 +21,26 @@ _GEMINI_OPENAI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
 
 # Curated model menus for the UI. Any model can still be forced via MAESTRO_MODEL
 # or by editing these lists.
+# Latest first. Any other model can be forced via MAESTRO_MODEL; availability
+# depends on your account, and an unknown name surfaces as a clear error.
 _GEMINI_MODELS = [
     "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
     "gemini-3.5-flash",
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
     "gemini-1.5-flash",
 ]
-_OPENAI_MODELS = ["gpt-5", "gpt-4o", "gpt-4o-mini", "gpt-4.1-mini"]
+_OPENAI_MODELS = [
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "o4-mini",
+]
 
 _DEFAULT_GEMINI = "gemini-2.5-flash"
 _DEFAULT_OPENAI = "gpt-4o-mini"
