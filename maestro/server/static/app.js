@@ -71,15 +71,75 @@ function init() {
     if (e.key === "Escape") closeDrawer();
   });
 
-  fetch("/health")
-    .then((r) => r.json())
-    .then((d) => ($("brain-badge").textContent = `brain: ${d.brain}`))
-    .catch(() => {});
+  $("model-select").addEventListener("change", () => {
+    try {
+      localStorage.setItem("maestro.model", $("model-select").value);
+    } catch (e) {
+      /* storage may be unavailable */
+    }
+    updateModelDot();
+  });
+  loadConfig();
+
   window.addEventListener("resize", () => {
     layout();
     redrawEdges();
   });
   $("goal").focus();
+}
+
+// ---------- model / provider config ----------
+async function loadConfig() {
+  let cfg;
+  try {
+    cfg = await (await fetch("/api/config")).json();
+  } catch (e) {
+    return;
+  }
+  const sel = $("model-select");
+  sel.innerHTML = "";
+  for (const p of cfg.providers) {
+    const group = document.createElement("optgroup");
+    const locked = !p.configured;
+    group.label = locked ? `${p.label} (add key)` : p.label;
+    for (const model of p.models) {
+      const opt = document.createElement("option");
+      opt.value = `${p.id}::${model}`;
+      opt.textContent = p.id === "simulated" ? "Offline (simulated)" : model;
+      opt.dataset.configured = String(p.configured);
+      if (locked) opt.disabled = true;
+      group.appendChild(opt);
+    }
+    sel.appendChild(group);
+  }
+  // Restore the last choice if it is still valid, else use the server default.
+  const saved = safeGet("maestro.model");
+  const values = [...sel.options].filter((o) => !o.disabled).map((o) => o.value);
+  const fallback = `${cfg.default.provider}::${cfg.default.model}`;
+  sel.value = saved && values.includes(saved) ? saved : values.includes(fallback) ? fallback : (values[0] || "");
+  updateModelDot();
+}
+
+function safeGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+function getSelection() {
+  const value = $("model-select").value || "simulated::simulated";
+  const [provider, model] = value.split("::");
+  return { provider, model };
+}
+
+function updateModelDot() {
+  const opt = $("model-select").selectedOptions[0];
+  const ready = opt ? opt.dataset.configured === "true" : true;
+  const dot = $("model-dot");
+  dot.className = `model-dot ${ready ? "ready" : "locked"}`;
+  dot.title = ready ? "model ready" : "API key not configured";
 }
 
 function setStatus(kind, label) {
@@ -104,21 +164,28 @@ async function startRun() {
   setStatus("running", "orchestrating");
   startTimer();
 
-  let data;
+  const { provider, model } = getSelection();
+  let resp, data;
   try {
-    const resp = await fetch("/api/runs", {
+    resp = await fetch("/api/runs", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ goal, researchers: state.teamSize }),
+      body: JSON.stringify({ goal, researchers: state.teamSize, provider, model }),
     });
     data = await resp.json();
   } catch (err) {
     setStatus("error", "failed to start");
+    toast("err", "Could not start the run", "Is the server still running?");
+    finishRun();
+    return;
+  }
+  if (!resp.ok) {
+    setStatus("error", "not configured");
+    toast("warn", "Model not configured", data.error || "Add an API key, or pick Offline.");
     finishRun();
     return;
   }
   state.runId = data.run_id;
-  $("brain-badge").textContent = `brain: ${data.brain}`;
   addHistory(data.run_id, goal, "running");
   openSocket(data.run_id);
 }
@@ -261,11 +328,14 @@ function handleEvent(evt) {
       if (state.runId) updateHistory(state.runId, "cancelled");
       feed("system", "system", "run cancelled");
       break;
-    case "error":
+    case "error": {
+      const msg = evt.data.message || "run failed";
       setStatus("error", "error");
       if (state.runId) updateHistory(state.runId, "failed");
-      feed("system", "system", evt.data.message || "run failed");
+      feed("system", "system", msg);
+      showRunErrorToast(msg);
       break;
+    }
   }
 }
 
@@ -456,6 +526,11 @@ function onRunCompleted(data) {
   }
   if (state.runId) updateHistory(state.runId, "completed");
   renderDeliverable(data.deliverable || "", data);
+  toast(
+    "ok",
+    "Deliverable ready",
+    `${data.agents ?? state.nodes.size} agents in ${((data.elapsed_ms ?? 0) / 1000).toFixed(1)}s`
+  );
 }
 
 // ---------- feed ----------
@@ -591,6 +666,39 @@ function escapeHtml(s) {
     /[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
   );
+}
+
+// ---------- toasts ----------
+function toast(kind, title, hint) {
+  const el = document.createElement("div");
+  el.className = `toast ${kind}`;
+  el.innerHTML = `<b>${escapeHtml(title)}</b>${
+    hint ? `<span class="t-hint">${escapeHtml(hint)}</span>` : ""
+  }`;
+  $("toasts").appendChild(el);
+  const life = kind === "ok" ? 2200 : 7500;
+  setTimeout(() => {
+    el.style.transition = "opacity 0.4s ease, transform 0.4s ease";
+    el.style.opacity = "0";
+    el.style.transform = "translateY(8px)";
+    setTimeout(() => el.remove(), 400);
+  }, life);
+}
+
+function showRunErrorToast(msg) {
+  if (/429|too many requests|rate limit/i.test(msg)) {
+    toast(
+      "warn",
+      "Rate limited by the model provider",
+      "Free-tier limit hit. Lower the team size, set MAESTRO_MAX_CONCURRENCY=1, wait a minute, or switch the model to Offline."
+    );
+  } else if (/503|unavailable|overloaded/i.test(msg)) {
+    toast("warn", "Model temporarily unavailable", "A transient provider error. Try running again.");
+  } else if (/401|403|api key|unauthorized|permission/i.test(msg)) {
+    toast("err", "Authentication failed", "Check that your API key is valid and has access to the model.");
+  } else {
+    toast("err", "Run failed", msg);
+  }
 }
 
 init();

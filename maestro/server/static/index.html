@@ -19,7 +19,10 @@
           <span class="brand-sub">multi-agent orchestration studio</span>
         </div>
         <div class="topbar-right">
-          <span id="brain-badge" class="badge">brain: ...</span>
+          <div class="model-picker" title="Choose the model">
+            <span id="model-dot" class="model-dot" title="model status"></span>
+            <select id="model-select" class="model-select" aria-label="Model"></select>
+          </div>
           <span id="status-pill" class="pill pill-idle">idle</span>
         </div>
       </header>
@@ -107,6 +110,8 @@
       <div class="drawer-label">Full reasoning</div>
       <pre id="drawer-body" class="drawer-body"></pre>
     </aside>
+
+    <div id="toasts" class="toasts"></div>
 
     <script src="/static/app.js"></script>
   </body>
