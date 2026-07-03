@@ -19,7 +19,7 @@ It is a demonstration of how to build and, just as importantly, how to *observe*
 ## Highlights
 
 - 🎛️ **Live mission control.** An animated agent graph where nodes light up as they think, edges pulse as work is handed off, and thoughts stream in token by token, alongside live token, tool-call, throughput, and latency metrics.
-- 🕹️ **Interactive.** Size the team (1 to 4 researchers), click any agent to inspect its full reasoning and tool calls, stop a run in flight, replay past runs from the history strip, and copy or download the final deliverable.
+- 🕹️ **Interactive.** Pick the model from a top-bar selector (offline, Gemini, or OpenAI) with a live indicator showing whether each key is configured, size the team (1 to 4 researchers), click any agent to inspect its full reasoning and tool calls, stop a run in flight, replay past runs from the history strip, and copy or download the final deliverable.
 - 🧠 **Real orchestration engine.** A recognisable multi-agent pattern (plan, fan out parallel research, synthesise, critique, write) built on async Python.
 - 🔭 **Event-sourced and observable.** Every action is an event on a per-run bus. The UI, a reconnecting client, run replay, and the tests are all projections of the same ordered, replayable stream.
 - 🔌 **Pluggable brains and tools.** Runs offline out of the box; add a free Gemini key (or OpenAI, or any OpenAI-compatible endpoint) for real models. Add tools without touching the agents.
@@ -123,7 +123,9 @@ export MAESTRO_MODEL=gemini-2.0-flash    # optional
 maestro serve
 ```
 
-For OpenAI, set `OPENAI_API_KEY` instead. Point `OPENAI_BASE_URL` or `GEMINI_BASE_URL` at vLLM, Together, Groq, or a local server.
+For OpenAI, set `OPENAI_API_KEY` instead (any model, including `gpt-5`, `gpt-4o`, `gpt-4o-mini`). Point `OPENAI_BASE_URL` or `GEMINI_BASE_URL` at vLLM, Together, Groq, or a local server.
+
+Once one or more keys are set, you can switch model and provider live from the **selector in the top bar**, without restarting. A green dot means the selected model's key is configured; providers without a key are shown but locked.
 
 ## Troubleshooting
 
