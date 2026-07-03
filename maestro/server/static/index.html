@@ -23,7 +23,7 @@
             <span id="model-dot" class="model-dot" title="model status"></span>
             <select id="model-select" class="model-select" aria-label="Model"></select>
           </div>
-          <span id="status-pill" class="pill pill-idle">idle</span>
+          <span id="status-pill" class="pill pill-idle" role="status" aria-live="polite">idle</span>
         </div>
       </header>
 
@@ -54,7 +54,12 @@
         <section class="graph-panel panel">
           <div class="panel-head">
             <h2>Agent graph</h2>
-            <span class="panel-hint" id="graph-hint">live orchestration</span>
+            <div class="head-actions">
+              <span class="panel-hint" id="graph-hint">live orchestration</span>
+              <button id="trace-btn" class="mini-btn" disabled title="Download the full event trace as JSON">
+                &#8595; trace
+              </button>
+            </div>
           </div>
           <div id="graph-wrap" class="graph-wrap">
             <svg id="graph" xmlns="http://www.w3.org/2000/svg"></svg>

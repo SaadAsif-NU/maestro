@@ -33,6 +33,9 @@ const state = {
   tools: 0,
   deliverableMd: "",
   history: [],
+  events: [],
+  runFinished: false,
+  reconnects: 0,
 };
 
 // ---------- setup ----------
@@ -66,6 +69,7 @@ function init() {
 
   $("copy-btn").onclick = copyDeliverable;
   $("download-btn").onclick = downloadDeliverable;
+  $("trace-btn").onclick = downloadTrace;
   $("drawer-close").onclick = closeDrawer;
   $("drawer-scrim").onclick = closeDrawer;
   document.addEventListener("keydown", (e) => {
@@ -209,8 +213,32 @@ function openSocket(runId) {
   const ws = new WebSocket(`${proto}://${location.host}/api/runs/${runId}/events`);
   state.ws = ws;
   ws.onmessage = (e) => handleEvent(JSON.parse(e.data));
-  ws.onclose = () => finishRun();
-  ws.onerror = () => setStatus("error", "connection error");
+  ws.onerror = () => {};
+  ws.onclose = () => onSocketClosed(runId);
+}
+
+// If the socket drops mid-run, reconnect and replay (the bus keeps the full log,
+// so the run is reconstructed with no gap). Give up after a few tries.
+function onSocketClosed(runId) {
+  if (state.runFinished || !state.running || runId !== state.runId) {
+    finishRun();
+    return;
+  }
+  if (state.reconnects >= 5) {
+    setStatus("error", "disconnected");
+    toast("err", "Lost connection to the run", "The server may have stopped. Start a new run.");
+    finishRun();
+    return;
+  }
+  state.reconnects += 1;
+  const pill = $("status-pill");
+  pill.className = "pill pill-running pill-reconnecting";
+  pill.textContent = "reconnecting";
+  setTimeout(() => {
+    if (state.runFinished || runId !== state.runId) return;
+    clearStageForReplay(); // avoid duplicating nodes/edges on replay
+    openSocket(runId);
+  }, 400 * state.reconnects);
 }
 
 async function stopRun() {
@@ -251,6 +279,24 @@ function resetUI() {
   $("m-tools").textContent = "0";
   $("m-time").textContent = "0.0s";
   $("m-rate").textContent = "tokens";
+  state.events = [];
+  state.runFinished = false;
+  state.reconnects = 0;
+  $("trace-btn").disabled = true;
+}
+
+// Clear only the rendered stage for a reconnect replay (keep run state/timer).
+function clearStageForReplay() {
+  $("nodes").innerHTML = "";
+  $("graph").innerHTML = "";
+  $("feed").innerHTML = "";
+  $("deliverable-panel").classList.add("hidden");
+  state.nodes.clear();
+  state.researchers = [];
+  state.edges = [];
+  state.events = [];
+  state.tokens = 0;
+  state.tools = 0;
 }
 
 // ---------- timers / metrics ----------
@@ -299,6 +345,11 @@ function renderHistory() {
 
 // ---------- event handling ----------
 function handleEvent(evt) {
+  state.events.push(evt);
+  $("trace-btn").disabled = false;
+  if (evt.type === "run_completed" || evt.type === "run_cancelled" || evt.type === "error") {
+    state.runFinished = true;
+  }
   switch (evt.type) {
     case "agent_spawned":
       addNode(evt.agent_id, evt.role, evt.data.title);
@@ -358,7 +409,16 @@ function addNode(id, role, title) {
       <span class="node-tokens">0 tok</span>
       <span class="node-tool"></span>
     </div>`;
+  el.setAttribute("tabindex", "0");
+  el.setAttribute("role", "button");
+  el.setAttribute("aria-label", `${role} agent ${title || role}. Activate to inspect its reasoning.`);
   el.onclick = () => openDrawer(id);
+  el.onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openDrawer(id);
+    }
+  };
   $("nodes").appendChild(el);
   state.nodes.set(id, {
     el,
@@ -621,11 +681,20 @@ function copyDeliverable() {
 }
 function downloadDeliverable() {
   if (!state.deliverableMd) return;
-  const blob = new Blob([state.deliverableMd], { type: "text/markdown" });
-  const url = URL.createObjectURL(blob);
+  downloadBlob(state.deliverableMd, "text/markdown", "maestro-deliverable.md");
+}
+
+function downloadTrace() {
+  if (!state.events.length) return;
+  const trace = { run_id: state.runId, events: state.events };
+  downloadBlob(JSON.stringify(trace, null, 2), "application/json", "maestro-trace.json");
+}
+
+function downloadBlob(content, type, filename) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = "maestro-deliverable.md";
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
