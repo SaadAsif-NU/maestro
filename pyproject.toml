@@ -67,7 +67,9 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "C4", "ASYNC"]
-ignore = ["E501"]
+# UP041 would rewrite asyncio.TimeoutError to TimeoutError, which breaks the
+# except clause on Python 3.10 (where they are distinct classes).
+ignore = ["E501", "UP041"]
 
 [tool.mypy]
 python_version = "3.12"

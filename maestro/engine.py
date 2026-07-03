@@ -107,7 +107,9 @@ class Engine:
                 tokens=handle.summary.total_tokens,
                 agents=handle.summary.agents,
             )
-        except TimeoutError:
+        except asyncio.TimeoutError:
+            # asyncio.TimeoutError is only an alias of builtin TimeoutError from
+            # 3.11+, so catch it by its asyncio name to also work on 3.10.
             handle.status = RunStatus.FAILED
             if not handle.bus.closed:
                 handle.bus.emit(ERROR, message="run timed out")
