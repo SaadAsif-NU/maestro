@@ -1,7 +1,8 @@
 """Real model brain backed by an OpenAI-compatible chat API.
 
-Works with OpenAI or any compatible endpoint (vLLM, Together, Groq, a local
-server). Streams tokens as they arrive so the live view stays real-time.
+Works with OpenAI, Google Gemini (via its OpenAI-compatible endpoint), or any
+compatible server (vLLM, Together, Groq, a local model). Streams tokens as they
+arrive so the live view stays real-time.
 """
 
 from __future__ import annotations
@@ -16,8 +17,6 @@ from .base import Brain
 
 
 class OpenAIBrain(Brain):
-    name = "openai"
-
     def __init__(
         self,
         *,
@@ -25,11 +24,14 @@ class OpenAIBrain(Brain):
         model: str = "gpt-4o-mini",
         base_url: str = "https://api.openai.com/v1",
         temperature: float = 0.4,
+        name: str | None = None,
     ) -> None:
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self._model = model
         self._base_url = base_url.rstrip("/")
         self._temperature = temperature
+        # Shown in the UI badge, e.g. "gemini-2.0-flash".
+        self.name = name or model
         self._client = httpx.AsyncClient(timeout=60.0)
 
     async def stream(

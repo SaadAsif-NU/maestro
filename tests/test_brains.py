@@ -41,3 +41,24 @@ async def test_orchestrator_references_goal():
     brain = SimulatedBrain(delay=0.0)
     out = await brain.complete("Reduce customer churn", role="orchestrator")
     assert "Reduce customer churn" in out
+
+
+async def test_build_brain_prefers_gemini(monkeypatch):
+    from maestro.brains import build_brain
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("MAESTRO_MODEL", "gemini-2.0-flash")
+    brain = build_brain()
+    assert brain.name == "gemini-2.0-flash"
+    assert "generativelanguage.googleapis.com" in brain._base_url
+    await brain.aclose()
+
+
+async def test_build_brain_defaults_to_offline(monkeypatch):
+    from maestro.brains import build_brain
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    assert build_brain().name == "simulated"
