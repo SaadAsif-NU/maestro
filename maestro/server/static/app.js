@@ -6,6 +6,7 @@ const ROLE_COLORS = {
   analyst: "var(--analyst)",
   critic: "var(--critic)",
   writer: "var(--writer)",
+  assistant: "var(--accent)",
 };
 
 const EXAMPLES = [
@@ -392,6 +393,7 @@ function layout() {
     n.el.style.left = `${x}px`;
     n.el.style.top = `${y}px`;
   };
+  place("assistant", W / 2, H * 0.44); // single-agent quick reply, centered
   place("orchestrator", W / 2, H * 0.09);
   const rs = state.researchers;
   rs.forEach((id, i) => {
@@ -526,11 +528,16 @@ function onRunCompleted(data) {
   }
   if (state.runId) updateHistory(state.runId, "completed");
   renderDeliverable(data.deliverable || "", data);
-  toast(
-    "ok",
-    "Deliverable ready",
-    `${data.agents ?? state.nodes.size} agents in ${((data.elapsed_ms ?? 0) / 1000).toFixed(1)}s`
-  );
+  if (data.mode === "chat") {
+    setStatus("done", "replied");
+    toast("ok", "Reply ready", "Type a concrete goal to run the full team.");
+  } else {
+    toast(
+      "ok",
+      "Deliverable ready",
+      `${data.agents ?? state.nodes.size} agents in ${((data.elapsed_ms ?? 0) / 1000).toFixed(1)}s`
+    );
+  }
 }
 
 // ---------- feed ----------
@@ -592,6 +599,8 @@ function refreshDrawer(id, force) {
 // ---------- deliverable ----------
 function renderDeliverable(md, data) {
   state.deliverableMd = md;
+  const heading = document.querySelector("#deliverable-panel .panel-head h2");
+  if (heading) heading.textContent = data.mode === "chat" ? "Reply" : "Deliverable";
   $("deliverable").innerHTML = renderMarkdown(md);
   $("deliverable-meta").textContent = `${data.agents ?? state.nodes.size} agents · ${
     data.total_tokens ?? state.tokens

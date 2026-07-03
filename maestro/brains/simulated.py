@@ -99,6 +99,16 @@ def _writer(prompt: str) -> str:
     )
 
 
+def _assistant(prompt: str) -> str:
+    return (
+        "Hi, I am Maestro, a live multi-agent studio. Give me a concrete goal, "
+        "for example \"Design a go-to-market strategy for a B2B SaaS analytics "
+        "product\", and I will assemble a team to research it, analyse the "
+        "findings, critique them, and deliver a result you can read and download. "
+        "What would you like to work on?"
+    )
+
+
 _SCRIPTS = {
     "orchestrator": _orchestrator,
     "researcher": _researcher_plan,
@@ -106,6 +116,7 @@ _SCRIPTS = {
     "analyst": _analyst,
     "critic": _critic,
     "writer": _writer,
+    "assistant": _assistant,
 }
 
 

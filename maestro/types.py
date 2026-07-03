@@ -13,6 +13,7 @@ class Role(str, Enum):
     ANALYST = "analyst"
     CRITIC = "critic"
     WRITER = "writer"
+    ASSISTANT = "assistant"
 
     @property
     def label(self) -> str:
