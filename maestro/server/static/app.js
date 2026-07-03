@@ -764,7 +764,13 @@ function toast(kind, title, hint) {
 }
 
 function showRunErrorToast(msg) {
-  if (/429|too many requests|rate limit/i.test(msg)) {
+  if (/timed out|timeout/i.test(msg)) {
+    toast(
+      "warn",
+      "The run took too long",
+      "On a free tier this is usually rate limiting. Try a smaller team, set MAESTRO_MAX_CONCURRENCY=1, use a faster model, or switch to Offline."
+    );
+  } else if (/429|too many requests|rate limit/i.test(msg)) {
     toast(
       "warn",
       "Rate limited by the model provider",

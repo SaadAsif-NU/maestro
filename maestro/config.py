@@ -50,7 +50,10 @@ class Settings:
             max_concurrency=max(1, _int("MAESTRO_MAX_CONCURRENCY", 3)),
             model_override=os.environ.get("MAESTRO_MODEL") or None,
             max_runs=max(1, _int("MAESTRO_MAX_RUNS", 200)),
-            run_timeout_s=_float("MAESTRO_RUN_TIMEOUT", 120.0),
+            # Generous by default so a real-model run that hits free-tier rate
+            # limits (retries + backoff) still finishes; a genuinely hung run is
+            # still bounded.
+            run_timeout_s=_float("MAESTRO_RUN_TIMEOUT", 300.0),
             max_concurrent_runs=max(1, _int("MAESTRO_MAX_CONCURRENT_RUNS", 8)),
             cors_origins=origins,
         )

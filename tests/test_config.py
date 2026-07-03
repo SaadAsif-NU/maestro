@@ -23,7 +23,7 @@ def test_defaults(monkeypatch):
     assert s.max_concurrency == 3
     assert s.model_override is None
     assert s.max_runs == 200
-    assert s.run_timeout_s == 120.0
+    assert s.run_timeout_s == 300.0
     assert s.max_concurrent_runs == 8
     assert s.cors_origins == ()
 
@@ -43,7 +43,7 @@ def test_invalid_numbers_fall_back(monkeypatch):
     monkeypatch.setenv("MAESTRO_RUN_TIMEOUT", "x")
     s = Settings.from_env()
     assert s.max_runs == 200
-    assert s.run_timeout_s == 120.0
+    assert s.run_timeout_s == 300.0
 
 
 def test_floors(monkeypatch):
