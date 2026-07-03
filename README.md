@@ -18,12 +18,17 @@ It is a demonstration of how to build and, just as importantly, how to *observe*
 
 ## Highlights
 
-- 🎛️ **Live mission control.** An animated agent graph where nodes light up as they think, edges pulse as work is handed off, and thoughts stream in token by token.
+- 🎛️ **Live mission control.** An animated agent graph where nodes light up as they think, edges pulse as work is handed off, and thoughts stream in token by token, alongside live token, tool-call, throughput, and latency metrics.
+- 🕹️ **Interactive.** Size the team (1 to 4 researchers), click any agent to inspect its full reasoning and tool calls, stop a run in flight, replay past runs from the history strip, and copy or download the final deliverable.
 - 🧠 **Real orchestration engine.** A recognisable multi-agent pattern (plan, fan out parallel research, synthesise, critique, write) built on async Python.
-- 🔭 **Event-sourced and observable.** Every action is an event on a per-run bus. The UI, a reconnecting client, and the tests are all projections of the same ordered, replayable stream.
-- 🔌 **Pluggable brains and tools.** Swap the offline brain for any OpenAI-compatible model; add tools (the demo ships a knowledge-base search and a safe calculator) without touching the agents.
+- 🔭 **Event-sourced and observable.** Every action is an event on a per-run bus. The UI, a reconnecting client, run replay, and the tests are all projections of the same ordered, replayable stream.
+- 🔌 **Pluggable brains and tools.** Runs offline out of the box; add a free Gemini key (or OpenAI, or any OpenAI-compatible endpoint) for real models. Add tools without touching the agents.
 - 🌐 **Build-free frontend.** The UI is served by the backend as static files. No Node toolchain, no bundler. `pip install` and it runs.
 - ✅ **Tested and typed.** Async `pytest` across the stack, `mypy`-clean, `ruff`-clean, CI on Python 3.10 to 3.13.
+
+Click any agent to open the inspector and read its full reasoning and tool calls:
+
+![Agent inspector](docs/maestro-inspector.png)
 
 ## How it works
 
@@ -86,15 +91,25 @@ maestro run "Design a go-to-market strategy for a B2B SaaS analytics product"
 
 ## Using real models
 
-Set an API key and the studio uses a live model instead of the offline brain:
+The studio runs offline by default. To use a real model, set a key and restart. The active model shows in the brain badge.
+
+**Google Gemini (free).** Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), then:
 
 ```bash
-export OPENAI_API_KEY=sk-...
-export MAESTRO_MODEL=gpt-4o-mini      # optional
+export GEMINI_API_KEY=your-key
+export MAESTRO_MODEL=gemini-2.0-flash   # optional
 maestro serve
 ```
 
-Any OpenAI-compatible endpoint works (set `OPENAI_BASE_URL` for vLLM, Together, Groq, or a local server).
+**OpenAI, or any OpenAI-compatible endpoint.**
+
+```bash
+export OPENAI_API_KEY=sk-...
+export MAESTRO_MODEL=gpt-4o-mini         # optional
+maestro serve
+```
+
+Set `OPENAI_BASE_URL` (or `GEMINI_BASE_URL`) to target vLLM, Together, Groq, or a local server.
 
 ## Extending
 
