@@ -41,10 +41,16 @@ class Engine:
         self._tools_factory = tools_factory
         self._runs: dict[str, RunHandle] = {}
 
-    def start_run(self, goal: str, *, researchers: int = 2) -> RunHandle:
+    def start_run(
+        self,
+        goal: str,
+        *,
+        researchers: int = 2,
+        brain_factory: Callable[[], Brain] | None = None,
+    ) -> RunHandle:
         run_id = f"run_{uuid.uuid4().hex[:12]}"
         bus = EventBus(run_id)
-        brain = self._brain_factory()
+        brain = (brain_factory or self._brain_factory)()
         orchestrator = Orchestrator(bus, brain, self._tools_factory(), researchers=researchers)
         handle = RunHandle(run_id=run_id, goal=goal, bus=bus)
         self._runs[run_id] = handle

@@ -67,6 +67,36 @@ async def test_build_brain_defaults_to_offline(monkeypatch):
     assert build_brain().name == "simulated"
 
 
+async def test_build_brain_explicit_provider_and_model(monkeypatch):
+    from maestro.brains import build_brain
+
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    brain = build_brain("gemini", "gemini-2.0-flash")
+    assert brain.name == "gemini-2.0-flash"
+    await brain.aclose()
+
+
+def test_build_brain_unconfigured_provider_falls_back_offline(monkeypatch):
+    from maestro.brains import build_brain
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    assert build_brain("gemini", "gemini-2.0-flash").name == "simulated"
+
+
+def test_provider_status_and_models(monkeypatch):
+    from maestro.brains import provider_models, provider_status
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    status = provider_status()
+    assert status["simulated"] is True
+    assert status["gemini"] is False and status["openai"] is False
+    assert "gpt-5" in provider_models("openai")
+    assert provider_models("simulated") == ["simulated"]
+
+
 async def test_openai_brain_retries_on_429():
     calls = {"n": 0}
     sse = 'data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n'

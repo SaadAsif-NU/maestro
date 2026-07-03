@@ -22,10 +22,16 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .. import __version__
-from ..brains import build_brain
+from ..brains import build_brain, default_selection, provider_models, provider_status
 from ..engine import Engine
 from ..env import load_env
 from ..types import RunRequest
+
+_PROVIDER_LABELS = {
+    "simulated": "Offline (no key needed)",
+    "gemini": "Google Gemini",
+    "openai": "OpenAI",
+}
 
 # Pick up keys/config from a .env file if present, so users need not export
 # environment variables in the shell.
@@ -41,13 +47,44 @@ engine = Engine()
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "version": __version__, "brain": build_brain().name}
+    provider, model = default_selection()
+    return {"status": "ok", "version": __version__, "brain": model}
+
+
+@app.get("/api/config")
+async def config() -> dict[str, object]:
+    """Which providers/models are available and whether each key is configured."""
+    status = provider_status()
+    default_provider, default_model = default_selection()
+    providers = [
+        {
+            "id": pid,
+            "label": _PROVIDER_LABELS.get(pid, pid),
+            "configured": status[pid],
+            "models": provider_models(pid),
+        }
+        for pid in ("simulated", "gemini", "openai")
+    ]
+    return {"providers": providers, "default": {"provider": default_provider, "model": default_model}}
 
 
 @app.post("/api/runs")
-async def start_run(body: RunRequest) -> dict[str, str]:
-    handle = engine.start_run(body.goal, researchers=body.researchers)
-    return {"run_id": handle.run_id, "brain": build_brain().name}
+async def start_run(body: RunRequest) -> JSONResponse:
+    provider = body.provider
+    model = body.model
+    if provider in ("gemini", "openai") and not provider_status().get(provider, False):
+        env = "GEMINI_API_KEY" if provider == "gemini" else "OPENAI_API_KEY"
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"{provider} is not configured; set {env} (or use offline)."},
+        )
+    handle = engine.start_run(
+        body.goal,
+        researchers=body.researchers,
+        brain_factory=(lambda: build_brain(provider, model)) if provider else None,
+    )
+    label = model if provider and provider != "simulated" else default_selection()[1]
+    return JSONResponse({"run_id": handle.run_id, "brain": label})
 
 
 @app.get("/api/runs")

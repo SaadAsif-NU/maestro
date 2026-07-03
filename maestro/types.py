@@ -62,6 +62,8 @@ class AgentResult(BaseModel):
 class RunRequest(BaseModel):
     goal: str = Field(..., min_length=1, max_length=2000)
     researchers: int = Field(default=2, ge=1, le=4)
+    provider: str | None = None
+    model: str | None = None
 
 
 class RunSummary(BaseModel):

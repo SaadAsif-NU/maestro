@@ -63,6 +63,28 @@ def test_team_size_is_configurable():
     assert run_id.startswith("run_")
 
 
+def test_config_lists_providers_with_status():
+    cfg = client.get("/api/config").json()
+    ids = {p["id"] for p in cfg["providers"]}
+    assert {"simulated", "gemini", "openai"} <= ids
+    simulated = next(p for p in cfg["providers"] if p["id"] == "simulated")
+    assert simulated["configured"] is True and simulated["models"]
+    assert "provider" in cfg["default"] and "model" in cfg["default"]
+
+
+def test_run_with_unconfigured_provider_is_400(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    resp = client.post("/api/runs", json={"goal": "x", "provider": "gemini"})
+    assert resp.status_code == 400
+    assert "GEMINI_API_KEY" in resp.json()["error"]
+
+
+def test_run_with_offline_provider_ok():
+    resp = client.post("/api/runs", json={"goal": "x", "provider": "simulated"})
+    assert resp.status_code == 200
+
+
 def test_invalid_goal_is_422():
     assert client.post("/api/runs", json={"goal": ""}).status_code == 422
 
