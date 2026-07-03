@@ -26,6 +26,8 @@ def build_brain() -> Brain:
 
     Override the model with ``MAESTRO_MODEL``.
     """
+    # Lower this (e.g. to 1) if a free tier keeps rate-limiting the fan-out.
+    max_concurrency = int(os.environ.get("MAESTRO_MAX_CONCURRENCY", "3"))
     gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if gemini_key:
         from .openai import OpenAIBrain
@@ -36,6 +38,7 @@ def build_brain() -> Brain:
             model=model,
             base_url=os.environ.get("GEMINI_BASE_URL", _GEMINI_OPENAI_BASE),
             name=model,
+            max_concurrency=max_concurrency,
         )
     if os.environ.get("OPENAI_API_KEY"):
         from .openai import OpenAIBrain
@@ -45,6 +48,7 @@ def build_brain() -> Brain:
             model=model,
             base_url=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
             name=model,
+            max_concurrency=max_concurrency,
         )
     return SimulatedBrain(delay=float(os.environ.get("MAESTRO_SIM_DELAY", "0.02")))
 

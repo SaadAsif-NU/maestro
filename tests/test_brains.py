@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import httpx
+
 from maestro.brains import SimulatedBrain
+from maestro.brains.openai import OpenAIBrain
 
 
 async def _collect(brain, prompt, role):
@@ -62,3 +65,38 @@ async def test_build_brain_defaults_to_offline(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     assert build_brain().name == "simulated"
+
+
+async def test_openai_brain_retries_on_429():
+    calls = {"n": 0}
+    sse = 'data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n'
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(429, text="rate limited")  # first attempt is throttled
+        return httpx.Response(200, text=sse)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    brain = OpenAIBrain(api_key="x", client=client, max_retries=3, backoff_base=0.0)
+    out = [chunk async for chunk in brain.stream("hello")]
+    assert "".join(out) == "hi"
+    assert calls["n"] == 2  # it retried the 429 and then succeeded
+    await brain.aclose()
+
+
+async def test_openai_brain_raises_after_exhausting_retries():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, text="always throttled")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    brain = OpenAIBrain(api_key="x", client=client, max_retries=2, backoff_base=0.0)
+    try:
+        with_raises = False
+        try:
+            [chunk async for chunk in brain.stream("hello")]
+        except httpx.HTTPStatusError:
+            with_raises = True
+        assert with_raises
+    finally:
+        await brain.aclose()
