@@ -65,7 +65,7 @@ The **engine** starts each run as a background task with its own **event bus**. 
 | Layer | Responsibility |
 |---|---|
 | `events` | The `Event` model and a replayable async `EventBus` (per-run pub/sub). |
-| `brains` | The `Brain` interface, a deterministic offline `SimulatedBrain`, and an OpenAI-compatible adapter. |
+| `brains` | The `Brain` interface, a deterministic offline `SimulatedBrain`, and one adapter for any OpenAI-compatible API. That single adapter (`brains/openai.py`) serves both OpenAI and Google Gemini, since Gemini exposes an OpenAI-compatible endpoint. |
 | `tools` | The `Tool` interface plus an offline knowledge-base `SearchTool` and a safe `CalculatorTool`. |
 | `agents` | An `Agent` that streams reasoning, calls tools, and emits an event for everything it does. |
 | `orchestrator` | Coordinates the ensemble: plan, parallel research, synthesise, critique, write. |
@@ -74,42 +74,65 @@ The **engine** starts each run as a background task with its own **event bus**. 
 
 The dependency direction is strict and one-way. The orchestrator depends on the `Brain` and `Tool` *interfaces*, never on concrete implementations, so the offline brain and a real model are perfectly interchangeable.
 
-## Quickstart
+## Getting started
+
+**Step 1. Prerequisites.** Python 3.10 or newer.
+
+**Step 2. Get the code and install it.**
 
 ```bash
+git clone https://github.com/SaadAsif-NU/maestro.git
+cd maestro
+python3 -m venv .venv
+source .venv/bin/activate           # on Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
-maestro serve            # open http://localhost:8000
 ```
 
-Enter a goal (or click an example) and press Run. No keys required.
-
-Prefer the terminal? Run a goal headless and print the deliverable:
+**Step 3. Run it (offline, no key needed).**
 
 ```bash
-maestro run "Design a go-to-market strategy for a B2B SaaS analytics product"
+maestro serve
 ```
 
-## Using real models
+Open **http://localhost:8000**, type a goal (or click an example), pick the team size, and press **Run**. Everything runs on the built-in offline brain, so no key and no internet are required.
 
-The studio runs offline by default. To use a real model, set a key and restart. The active model shows in the brain badge.
+- Stop the server with `Ctrl+C`.
+- Use a different port with `maestro serve --port 8080`.
+- If `maestro serve` is not found (some shells or a project path with spaces), use the equivalent: `python -m uvicorn maestro.server.app:app --port 8000`.
+- Prefer the terminal? `maestro run "Design a launch plan for a new product"` prints the deliverable.
 
-**Google Gemini (free).** Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), then:
+## Using a real model (Gemini or OpenAI)
+
+The studio runs offline by default. To use a real model, provide an API key. There are two ways; the active model always shows in the brain badge.
+
+### Option A: a `.env` file (recommended, no terminal exports)
+
+```bash
+cp .env.example .env
+# open .env and paste your key, then:
+maestro serve
+```
+
+Get a **free Gemini key** at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). Maestro loads `.env` automatically on startup, and `.env` is gitignored so your key never gets committed. To change the model later, edit `.env` and restart.
+
+### Option B: environment variables (per shell session)
 
 ```bash
 export GEMINI_API_KEY=your-key
-export MAESTRO_MODEL=gemini-2.0-flash   # optional
+export MAESTRO_MODEL=gemini-2.0-flash    # optional
 maestro serve
 ```
 
-**OpenAI, or any OpenAI-compatible endpoint.**
+For OpenAI, set `OPENAI_API_KEY` instead. Point `OPENAI_BASE_URL` or `GEMINI_BASE_URL` at vLLM, Together, Groq, or a local server.
 
-```bash
-export OPENAI_API_KEY=sk-...
-export MAESTRO_MODEL=gpt-4o-mini         # optional
-maestro serve
-```
+## Troubleshooting
 
-Set `OPENAI_BASE_URL` (or `GEMINI_BASE_URL`) to target vLLM, Together, Groq, or a local server.
+| Symptom | What to do |
+|---|---|
+| `429 Too Many Requests` | A free-tier per-minute limit from the parallel fan-out. Maestro auto-retries with backoff; you can also lower `MAESTRO_MAX_CONCURRENCY` (to `1`), reduce the researcher count in the UI, or wait about a minute. |
+| `503 Service Unavailable` | A transient error on the provider's side. Maestro retries it automatically; if it persists, wait and run again. |
+| Port already in use | Start on another port: `maestro serve --port 8080`. |
+| Want a guaranteed-smooth demo | Leave the key blank (or `unset GEMINI_API_KEY`) to run on the offline brain: instant, unlimited, no network. |
 
 ## Extending
 
