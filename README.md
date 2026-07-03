@@ -24,7 +24,9 @@ It is a demonstration of how to build and, just as importantly, how to *observe*
 - 🔭 **Event-sourced and observable.** Every action is an event on a per-run bus. The UI, a reconnecting client, run replay, and the tests are all projections of the same ordered, replayable stream.
 - 🔌 **Pluggable brains and tools.** Runs offline out of the box; add a free Gemini key (or OpenAI, or any OpenAI-compatible endpoint) for real models. Add tools without touching the agents.
 - 🌐 **Build-free frontend.** The UI is served by the backend as static files. No Node toolchain, no bundler. `pip install` and it runs.
-- ✅ **Tested and typed.** Async `pytest` across the stack, `mypy`-clean, `ruff`-clean, CI on Python 3.10 to 3.13.
+- 🛡️ **Production-minded.** Centralised typed settings, structured JSON logging, a bounded run store, per-run timeouts, and a concurrent-run cap. Trivial input (a greeting) is triaged to a single quick reply instead of a full six-agent run.
+- ♿ **Accessible and resilient.** Keyboard-navigable agent nodes, visible focus, reduced-motion support, and a WebSocket that auto-reconnects and replays if the connection drops.
+- ✅ **Tested and typed.** Async `pytest` across the stack (73 tests), `mypy`-clean, `ruff`-clean, a typed OpenAPI surface, `py.typed`, and CI on Python 3.10 to 3.13.
 
 Click any agent to open the inspector and read its full reasoning and tool calls:
 
@@ -69,8 +71,10 @@ The **engine** starts each run as a background task with its own **event bus**. 
 | `tools` | The `Tool` interface plus an offline knowledge-base `SearchTool` and a safe `CalculatorTool`. |
 | `agents` | An `Agent` that streams reasoning, calls tools, and emits an event for everything it does. |
 | `orchestrator` | Coordinates the ensemble: plan, parallel research, synthesise, critique, write. |
-| `engine` | Run lifecycle: background execution, status, and event subscription. |
-| `server` | FastAPI + WebSocket API, and the static mission-control UI. |
+| `engine` | Run lifecycle: background execution, status, event subscription, and the reliability guards (bounded store, timeout, concurrency cap). |
+| `config` | One typed `Settings` object; the single source for every environment knob. |
+| `observability` | Structured JSON logging used across the run lifecycle. |
+| `server` | FastAPI + WebSocket API (typed OpenAPI surface), and the static mission-control UI. |
 
 The dependency direction is strict and one-way. The orchestrator depends on the `Brain` and `Tool` *interfaces*, never on concrete implementations, so the offline brain and a real model are perfectly interchangeable.
 
@@ -126,6 +130,26 @@ maestro serve
 For OpenAI, set `OPENAI_API_KEY` instead (any model, including `gpt-5`, `gpt-4o`, `gpt-4o-mini`). Point `OPENAI_BASE_URL` or `GEMINI_BASE_URL` at vLLM, Together, Groq, or a local server.
 
 Once one or more keys are set, you can switch model and provider live from the **selector in the top bar**, without restarting. A green dot means the selected model's key is configured; providers without a key are shown but locked.
+
+## Configuration
+
+Every knob is read once, in one typed place (`maestro/config.py`), from the
+environment (or `.env`).
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GEMINI_API_KEY` / `OPENAI_API_KEY` | (unset) | Enable a real provider. Without either, the offline brain is used. |
+| `MAESTRO_MODEL` | provider default | Force a specific model. |
+| `MAESTRO_MAX_CONCURRENCY` | `3` | Max simultaneous upstream calls (lower to `1` on strict free tiers). |
+| `MAESTRO_MAX_CONCURRENT_RUNS` | `8` | Max runs active at once (returns `503` beyond this). |
+| `MAESTRO_MAX_RUNS` | `200` | Bound on retained runs; oldest finished runs are evicted. |
+| `MAESTRO_RUN_TIMEOUT` | `120` | Per-run wall-clock timeout in seconds. |
+| `MAESTRO_LOG_LEVEL` | `INFO` | Structured-log level. |
+| `MAESTRO_CORS_ORIGINS` | (same-origin) | Comma-separated allowed origins. |
+
+Each run emits structured JSON logs (`run.started`, `run.completed`, `run.failed`,
+`run.timeout`, `ws.connected`), and the full event trace of any run can be
+downloaded as JSON from the UI.
 
 ## Troubleshooting
 

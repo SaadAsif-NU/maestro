@@ -6,7 +6,12 @@ services:
       - "8000:8000"
     environment:
       MAESTRO_LOG_LEVEL: INFO
+      # Reliability guards (see the README Configuration table):
+      # MAESTRO_MAX_CONCURRENCY: "3"
+      # MAESTRO_MAX_CONCURRENT_RUNS: "8"
+      # MAESTRO_RUN_TIMEOUT: "120"
       # Drop in a real key to run live models instead of the offline simulation:
+      # GEMINI_API_KEY: ${GEMINI_API_KEY}
       # OPENAI_API_KEY: ${OPENAI_API_KEY}
     restart: unless-stopped
     healthcheck:
