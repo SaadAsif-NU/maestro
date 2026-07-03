@@ -31,7 +31,9 @@ jobs:
           pip install -e ".[dev]"
       - name: Lint (ruff)
         run: ruff check maestro tests
+      - name: Format check (ruff)
+        run: ruff format --check maestro tests
       - name: Type-check (mypy)
         run: mypy
-      - name: Test (pytest + coverage)
-        run: pytest --cov=maestro --cov-report=term-missing
+      - name: Test (pytest + coverage gate)
+        run: pytest --cov=maestro --cov-report=term-missing --cov-fail-under=85

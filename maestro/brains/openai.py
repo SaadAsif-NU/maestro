@@ -90,7 +90,9 @@ class OpenAIBrain(Brain):
                     ) as resp:
                         if resp.status_code in _RETRY_STATUS and attempt < self._max_retries:
                             await resp.aread()
-                            await asyncio.sleep(_retry_after(resp.headers) or self._backoff(attempt))
+                            await asyncio.sleep(
+                                _retry_after(resp.headers) or self._backoff(attempt)
+                            )
                             continue
                         resp.raise_for_status()
                         async for line in resp.aiter_lines():
