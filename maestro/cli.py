@@ -10,12 +10,14 @@ from . import __version__
 
 def main(argv: list[str] | None = None) -> int:
     import argparse
+    from pathlib import Path
 
     from .config import Settings
     from .env import load_env
     from .observability import configure_logging
 
-    load_env()  # load a .env file if present
+    load_env()  # a .env in the working directory, if present
+    load_env(Path(__file__).resolve().parents[1] / ".env")  # or next to the package
     configure_logging(Settings.from_env().log_level)
 
     parser = argparse.ArgumentParser(prog="maestro", description="Maestro multi-agent studio")

@@ -24,14 +24,16 @@ _GEMINI_OPENAI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"
 # or by editing these lists.
 # Latest first. Any other model can be forced via MAESTRO_MODEL; availability
 # depends on your account, and an unknown name surfaces as a clear error.
+# Models verified to answer on Gemini's OpenAI-compatible chat endpoint. Several
+# older ids (gemini-2.0-flash, gemini-1.5-flash) and gemini-2.5-pro return 404
+# there even though they appear in the /models list, so they are left out to
+# keep every option in the picker actually runnable. The "-latest" aliases track
+# Google's current pick and are the most future-proof.
 _GEMINI_MODELS = [
     "gemini-2.5-flash",
-    "gemini-2.5-pro",
     "gemini-2.5-flash-lite",
+    "gemini-flash-latest",
     "gemini-3.5-flash",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash",
 ]
 _OPENAI_MODELS = [
     "gpt-5",

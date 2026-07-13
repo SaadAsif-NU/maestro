@@ -50,8 +50,12 @@ _PROVIDER_LABELS = {
     "openai": "OpenAI",
 }
 
-# Load a .env before reading settings, then configure logging.
+# Load a .env before reading settings, then configure logging. Try the current
+# working directory first (the usual case) and then the project root next to the
+# package, so the server finds the key no matter which directory it is launched
+# from (uvicorn, `maestro serve`, an IDE, ...).
 load_env()
+load_env(Path(__file__).resolve().parents[2] / ".env")
 settings = Settings.from_env()
 configure_logging(settings.log_level)
 
