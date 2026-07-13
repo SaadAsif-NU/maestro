@@ -35,11 +35,13 @@ def _subject(goal: str) -> str:
 
 def _subquestions(goal: str, n: int) -> list[tuple[str, str]]:
     subject = _subject(goal)
+    # Domain-agnostic angles: they fit a fitness plan, a software design, or a
+    # business strategy equally, so the research never forces a business lens.
     angles = [
-        ("Demand and opportunity", f"market demand and opportunity for {subject}"),
-        ("Risks and constraints", f"risks, costs and constraints around {subject}"),
-        ("Best practices", f"proven best-practice approaches to {subject}"),
-        ("Competitive landscape", f"competitive and comparable approaches to {subject}"),
+        ("Core components", f"the essential components and key elements of {subject}"),
+        ("Constraints and pitfalls", f"key constraints, risks, and common mistakes in {subject}"),
+        ("Best practices", f"proven best practices and effective methods for {subject}"),
+        ("Structure and steps", f"a concrete step-by-step structure or schedule for {subject}"),
     ]
     return angles[:n]
 

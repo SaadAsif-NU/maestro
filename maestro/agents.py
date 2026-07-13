@@ -16,6 +16,7 @@ from .events import (
     TOOL_RESULT,
     EventBus,
 )
+from .prompts import ROLE_SYSTEM
 from .tools.base import Tool
 from .types import AgentResult, AgentStatus, Role, Task, ToolCall
 
@@ -46,7 +47,10 @@ class Agent:
         self._status(AgentStatus.THINKING)
         parts: list[str] = []
         tokens = 0
-        async for chunk in self._brain.stream(prompt, role=role_hint):
+        # The system prompt tells a real model what this role must produce; the
+        # offline brain ignores it and scripts from ``role`` instead.
+        system = ROLE_SYSTEM.get(role_hint)
+        async for chunk in self._brain.stream(prompt, system=system, role=role_hint):
             self._bus.emit(TOKEN, agent_id=self.id, role=self.role.value, text=chunk)
             parts.append(chunk)
             tokens += 1
